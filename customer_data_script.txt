@@ -1,0 +1,55 @@
+-- SQL Script to Clean and Transform Customer Data
+
+-- Step 1: Create a backup of the original table
+CREATE TABLE customer_data_backup AS
+SELECT * FROM customer_data;
+
+-- Step 2: Remove duplicate records
+DELETE FROM customer_data
+WHERE rowid NOT IN (
+    SELECT MIN(rowid)
+    FROM customer_data
+    GROUP BY CustomerID -- Adjust this column to your unique ID
+);
+
+-- Step 3: Remove rows with NULL values in crucial fields
+DELETE FROM customer_data
+WHERE FirstName IS NULL OR LastName IS NULL OR Address IS NULL;
+
+-- Step 4: Change data types (e.g., assuming ID should be INTEGER and Price should be REAL)
+CREATE TABLE customer_data_new (
+    CustomerID INTEGER PRIMARY KEY,
+    FirstName TEXT,
+    LastName TEXT,
+    Address TEXT,
+    ZIPCode TEXT, -- Adding a separate ZIPCode field
+    TotalPrice REAL
+);
+
+-- Step 5: Populate the new table while separating the ZIP code
+INSERT INTO customer_data_new (CustomerID, FirstName, LastName, Address, ZIPCode)
+SELECT CustomerID, FirstName, LastName, Address,
+       SUBSTR(Address, -5) AS ZIPCode -- Assuming ZIP code is the last 5 characters
+FROM customer_data;
+
+-- Step 6: Add the TotalPrice column (if needed) and calculate its value (assuming a Price column exists)
+UPDATE customer_data_new
+SET TotalPrice = Price * Quantity; -- Adjust according to your business logic
+
+-- Step 7: Drop the old table and rename the new table
+DROP TABLE customer_data;
+ALTER TABLE customer_data_new RENAME TO customer_data;
+
+-- Step 8: Create a view for counting products and calculating total quantity and total price
+CREATE VIEW product_summary AS
+SELECT ProductID,               -- Adjust as necessary for your Product identifier
+       COUNT(*) AS TotalCount,  -- Total number of products
+       SUM(Quantity) AS TotalQuantity,  -- Total quantity of products
+       SUM(TotalPrice) AS TotalPrice  -- Total price for all products
+FROM customer_data
+GROUP BY ProductID;
+
+-- Step 9: Retrieve data for plotting charts
+SELECT FirstName, LastName, TotalPrice
+FROM customer_data
+ORDER BY TotalPrice DESC;
